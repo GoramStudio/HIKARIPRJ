@@ -1,59 +1,53 @@
-import tkinter as tk
-from tkinter import filedialog
-from PIL import Image, ImageTk
 import serial
-import time
-import cv2
-import numpy as np
+import tkinter as tk
 
-def send_data(image_path, text):
-    ser = serial.Serial('COM4', 115200)
-    time.sleep(2)
-    
-    # Process image
-    img = Image.open(image_path).convert('L')
-    img = img.resize((64, 64), Image.ANTIALIAS)
-    img = img.point(lambda p: 255 if p > 128 else 0, '1')
-    img_data = np.array(img, dtype=np.uint8)
-    
-    # Send image
-    for y in range(0, 64, 8):
-        for x in range(0, 64, 8):
-            block = img_data[y:y+8, x:x+8]
-            block_bytes = [int("".join(str(1-int(bit)) for bit in row), 2) for row in block]
-            ser.write(bytearray([x, y]))
-            ser.write(bytearray(block_bytes))
-            time.sleep(0.005)
-    
-    # Send text
-    ser.write(b'TEXT:' + text.encode('utf-8') + b'\n')
-    ser.close()
+# Configuration du port série
+SERIAL_PORT = "COM4"  # Changez selon votre configuration
+BAUD_RATE = 9600
 
-def select_image():
-    file_path = filedialog.askopenfilename()
-    if file_path:
-        img = Image.open(file_path)
-        img.thumbnail((100, 100))
-        img_tk = ImageTk.PhotoImage(img)
-        img_label.config(image=img_tk)
-        img_label.image = img_tk
-        img_label.file_path = file_path
+try:
+    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+except serial.SerialException:
+    print(f"Erreur : Impossible d'ouvrir le port {SERIAL_PORT}")
+    ser = None
 
-def send():
-    text = text_entry.get()
-    image_path = getattr(img_label, 'file_path', None)
-    if image_path and text:
-        send_data(image_path, text)
+def send_text(event=None):
+    """Envoie le texte entré par l'utilisateur au port série."""
+    if ser:
+        text = entry.get()
+        style = f"S{size_var.get()}B{bold_var.get()}C{color_var.get()}"  # Ajout couleur
+        ser.write((style + text + "\n").encode('utf-8'))
 
-# GUI
+# Interface graphique Tkinter
 root = tk.Tk()
-root.title("Image & Text Sender")
+root.title("Affichage Arduino")
 
-tk.Button(root, text="Select Image", command=select_image).pack()
-img_label = tk.Label(root)
-img_label.pack()
-text_entry = tk.Entry(root)
-text_entry.pack()
-tk.Button(root, text="Send", command=send).pack()
+tk.Label(root, text="Texte à envoyer :").pack()
+entry = tk.Entry(root, width=40, font=("Arial", 14))
+entry.pack(pady=5)
+entry.bind("<KeyRelease>", send_text)  # Envoi du texte à chaque frappe
+
+# Choix de la taille du texte
+tk.Label(root, text="Taille du texte :").pack()
+size_var = tk.IntVar(value=1)
+size_scale = tk.Scale(root, from_=1, to=3, orient="horizontal", variable=size_var, command=lambda x: send_text())
+size_scale.pack()
+
+# Option de gras
+bold_var = tk.IntVar(value=0)
+bold_check = tk.Checkbutton(root, text="Gras", variable=bold_var, command=send_text)
+bold_check.pack()
+
+# Option de couleur
+tk.Label(root, text="Couleur :").pack()
+color_var = tk.IntVar(value=1)  # 1 = Blanc, 0 = Noir
+color_white = tk.Radiobutton(root, text="Blanc", variable=color_var, value=1, command=send_text)
+color_black = tk.Radiobutton(root, text="Noir", variable=color_var, value=0, command=send_text)
+color_white.pack()
+color_black.pack()
 
 root.mainloop()
+
+# Fermeture propre du port série
+if ser:
+    ser.close()
