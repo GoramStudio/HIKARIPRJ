@@ -1,64 +1,60 @@
-import serial
-import tkinter as tk
-from tkinter import filedialog
-from PIL import Image
+from PIL import Image, ImageSequence
+import sys
 
-# Configuration du port série (remplacez 'COM4' par votre port si nécessaire)
-SERIAL_PORT = "COM4"
-BAUD_RATE = 9600
+def convert_gif_to_arduino(gif_path, output_path):
+    try:
+        image = Image.open(gif_path)
+        frames = [frame.convert('1') for frame in ImageSequence.Iterator(image)]
+    except Exception as e:
+        print(f"Erreur lors de la lecture du GIF : {e}")
+        return
+    
+    frame_data = []
+    for frame in frames:
+        frame_bytes = []
+        for y in range(frame.height):
+            row = []
+            for x in range(frame.width):
+                pixel = frame.getpixel((x, y))
+                row.append('1' if pixel == 0 else '0')
+            frame_bytes.append("0b" + "".join(row))
+        frame_data.append(frame_bytes)
+    
+    with open(output_path, "w") as f:
+        f.write("#include <SPI.h>\n")
+        f.write("#include <Wire.h>\n")
+        f.write("#include <Adafruit_GFX.h>\n")
+        f.write("#include <Adafruit_SH110X.h>\n\n")
+        f.write("#define SCREEN_WIDTH 128\n")
+        f.write("#define SCREEN_HEIGHT 64\n")
+        f.write("#define OLED_RESET -1\n")
+        f.write("Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);\n\n")
+        f.write("const uint8_t animation[][SCREEN_HEIGHT] PROGMEM = {\n")
+        for frame in frame_data:
+            f.write("  {" + ", ".join(frame) + "},\n")
+        f.write("};\n\n")
+        f.write("void setup() {\n")
+        f.write("  display.begin(0x3C, true);\n")
+        f.write("  display.clearDisplay();\n")
+        f.write("}\n\n")
+        f.write("void loop() {\n")
+        f.write("  for (int i = 0; i < sizeof(animation)/sizeof(animation[0]); i++) {\n")
+        f.write("    display.clearDisplay();\n")
+        f.write("    for (int y = 0; y < SCREEN_HEIGHT; y++) {\n")
+        f.write("      for (int x = 0; x < SCREEN_WIDTH; x++) {\n")
+        f.write("        if (pgm_read_byte(&animation[i][y]) & (1 << x)) {\n")
+        f.write("          display.drawPixel(x, y, SH110X_WHITE);\n")
+        f.write("        }\n")
+        f.write("      }\n")
+        f.write("    }\n")
+        f.write("    display.display();\n")
+        f.write("    delay(100);\n")
+        f.write("  }\n")
+        f.write("}\n")
+    print(f"Code Arduino généré et enregistré dans {output_path}")
 
-# Ouverture du port série
-try:
-    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-except serial.SerialException:
-    print(f"Erreur : Impossible d'ouvrir le port {SERIAL_PORT}")
-    ser = None
-
-def send_gif():
-    """Sélectionne un GIF, le lit et envoie une seule frame à l'Arduino."""
-    if ser:
-        # Ouvre une fenêtre pour choisir le fichier GIF
-        filepath = filedialog.askopenfilename(filetypes=[("Fichiers GIF", "*.gif")])
-        if not filepath:
-            return
-        
-        # Ouvre le fichier GIF
-        gif = Image.open(filepath)
-        
-        # On prend la première frame du GIF pour tester
-        frame = gif.convert("1")  # Convertir en noir et blanc (mode binaire)
-        frame = frame.resize((128, 64))  # Redimensionner pour correspondre à l'écran
-        
-        pixels = frame.load()  # Charger les pixels de l'image
-        
-        # Envoi de chaque ligne de pixels de l'image
-        for y in range(64):  # Parcours chaque ligne de l'image
-            line_data = []
-            for x in range(0, 128, 8):  # Parcours chaque colonne de 8 pixels
-                byte = 0
-                for bit in range(8):
-                    pixel_value = 255 if pixels[x + bit, y] == 255 else 0  # Blanc=255, Noir=0
-                    byte |= (pixel_value << (7 - bit))  # Décalage des bits pour former un octet
-                line_data.append(byte)  # Ajouter l'octet à la ligne
-                
-            # Envoie de chaque ligne de 16 octets à l'Arduino
-            for byte in line_data:
-                ser.write(bytes([byte]))  # Envoi de l'octet
-            time.sleep(0.005)  # Petit délai pour assurer que l'Arduino peut traiter la donnée
-            
-        ser.write(b'\n')  # Fin de la frame
-        
-        print("Une seule frame envoyée à l'Arduino.")
-
-# Interface graphique Tkinter
-root = tk.Tk()
-root.title("Envoyer un GIF à l'Arduino")
-
-send_button = tk.Button(root, text="Envoyer un GIF", font=("Arial", 14), command=send_gif)
-send_button.pack(pady=20)
-
-root.mainloop()
-
-# Fermeture propre du port série
-if ser:
-    ser.close()
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python script.py <input_gif> <output_ino>")
+    else:
+        convert_gif_to_arduino(sys.argv[1], sys.argv[2])
