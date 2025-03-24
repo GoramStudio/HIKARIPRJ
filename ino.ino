@@ -24,7 +24,9 @@ void loop() {
     int yOffset = (SCREEN_HEIGHT - 64) / 2;
     for (int y = 0; y < 64; y++) {
       for (int x = 0; x < 64; x++) {
-        if (pgm_read_byte(&animation[i][(y * 8) + (x / 8)]) & (1 << (7 - (x % 8)))) {
+        uint8_t byteIndex = (y * 64 + x) / 8;
+        uint8_t bitIndex = 7 - (x % 8);
+        if (pgm_read_byte(&animation[i][byteIndex]) & (1 << bitIndex)) {
           display.drawPixel(x + xOffset, y + yOffset, SH110X_WHITE);
         }
       }
