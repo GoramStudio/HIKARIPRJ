@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="description" content="Chat & centre de monitoring RADIO AI OSHINO !!!! :3 ૮ ˶ᵔ ᵕ ᵔ˶ ა 𐙚">
+    <link rel="icon" href="favicon.ico" type="ico">
+    <title>AI OSHINO Chat</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            font-size: 18px; /* Increase overall font size */
+        }
+        #chatContainer { display: none; }
+        #callsignContainer { display: block; }
+        .container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+        .sidebar, .gif-sidebar {
+            flex: 1;
+            background: #1e1e1e;
+            padding: 10px;
+            border: 1px solid #444;
+            overflow: hidden;
+        }
+        #chatBox {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 100%;
+            max-height: 90vh; /* Limit the chat box height to 90% of the viewport */
+            overflow: hidden; /* Prevent content from spilling out */
+        }
+        #chatContainer {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Prevent content from spilling out */
+            max-height: 100%; /* Ensure the chat container stays within the chat box */
+        }
+        #messages {
+            flex: 1;
+            overflow-y: auto; /* Enable vertical scrolling */
+            word-wrap: break-word; /* Ensure long words or links wrap properly */
+            border: 1px solid #444;
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #1e1e1e;
+            color: white;
+            text-align: left;
+            max-height: calc(100% - 350px); /* Adjust to fit within the container */
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+        }
+        button:hover {
+            background-color: #444;
+        }
+        a { color: #4db8ff; }
+        .info-box {
+            background: #1e1e1e;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #444;
+            text-align: left;
+        }
+        .gif-sidebar img {
+            width: 100%;
+            margin-bottom: 10px;
+            border: 1px solid #444;
+        }
+        .gif-sidebar img.small {
+            width: 80%;
+        }
+        .gif-sidebar img.large {
+            width: 120%;
+        }
+        .solar-activity {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .solar-activity img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        @media (min-width: 768px) {
+            .container {
+                flex-direction: row;
+            }
+            .sidebar, .gif-sidebar {
+                flex: 1;
+            }
+            #chatBox {
+                flex: 3;
+            }
+        }
+        @media (max-width: 767px) {
+            .container {
+                flex-direction: column;
+            }
+            .sidebar, .gif-sidebar {
+                display: none;
+            }
+            #chatBox {
+                flex: 1;
+            }
+            #messages {
+                flex: 1;
+                overflow-y: auto;
+            }
+            input, button {
+                width: calc(100% - 20px);
+            }
+        }
+        #tutorialContainer h3 {
+            font-size: 24px; /* Larger font size for section titles */
+        }
+        #tutorialContainer p {
+            font-size: 20px; /* Larger font size for explanations */
+        }
+        #tutorialContainer strong {
+            font-size: 22px; /* Larger font size for bold titles */
+        }
+    </style>
+</head>
+<body>
+    <h2>Bienvenue sur le chat AI OSHINO</h2>
+    <div id="callsignContainer">
+        <p>Entrez votre "callsign" (pseudo) pour accéder au chat (max 10 caractères).</p>
+        <input type="text" id="callsign" maxlength="10" placeholder="Votre callsign">
+        <button onclick="enterChat()">Entrer</button>
+    </div>
+    
+    <div class="container">
+        <div class="gif-sidebar" id="leftGifSidebar">
+            <img src="https://media1.tenor.com/m/kwua3gMiSXEAAAAd/kurumi-tokisaki-date-a-live.gif" alt="Anime GIF 1" class="small">
+            <img src="https://media1.tenor.com/m/P7hCyZlzDH4AAAAd/wink-anime.gif" alt="Anime GIF 2">
+            <img src="https://media.tenor.com/o4aOknzsgTIAAAAj/oki.gif" alt="Anime GIF 3" class="large">
+            <img src="https://media1.tenor.com/m/X51YpCwWbBIAAAAd/konata-brain-less.gif" alt="Anime GIF 4">
+            <img src="https://media1.tenor.com/m/kfXicpYoZMAAAAAd/anime-lily.gif" alt="Anime GIF 5" class="small">
+            <img src="https://media.tenor.com/V-frb4Y_9iQAAAAj/admincorno-ditf.gif" alt="Anime GIF 6" class="large">
+        </div>
+        <div class="sidebar" id="leftSidebar">
+            <h3>Statut</h3>
+            <div class="info-box">
+                <p>Ping Chat: <span id="pingChat">...</span> ms</p>
+                <p>Ping SDR: <span id="pingSDR">...</span> ms</p>
+                <p>Ping Firebase: <span id="pingFirebase">...</span> ms</p>
+            </div>
+            <h3>Météo</h3>
+            <div class="info-box" id="weatherBox">
+                <p id="weather">Chargement...</p>
+            </div>
+        </div>
+        
+        <div id="chatBox">
+            <div id="tutorialContainer" style="text-align: center; margin: 20px;">
+                <h3>Infos :</h3>
+                <p><strong>Le OpenWebRx :</strong></p>
+                <p>Ceci est la page d'acceuil du RX "Ai Oshino" qui est le centre d'un réseau de comunication radio locale le "radiata network", mais il est également ouvert au publique ici : <a href="http://sdr.aioshino.xyz:8073" target="_blank">http://sdr.aioshino.xyz:8073</a>. Vous pouvez vous servir vous et vos amis des bandes de fréquences disponibles pour écouter la CB, la HAM radio, l'aviation, etc.</p>
+                <p><strong>Infos sur le RX :</strong></p>
+                <p>Ce RX est un dans sa quasi totalité DIY, il est composé d'un Serveur sous debian faisant tourner une version custom d'OpenWebRX-Plus, d'un RTL-SDR V4 customisé lui aussi pour pouvoir fonctionner avec l'antenne dipole passive faite maison sur la quel il est branché. une carte des récéptions est disponible a : <a href="http://sdr.aioshino.xyz:8073/map" target="_blank"></a> </p>
+                <p><strong>Si vous débutez ou que vous voulez discuter :</strong></p>
+                <p>Nous avons un Discord ouvert au public et en toutes langues ici : <a href="https://discord.gg/BxkxRqGDfK" target="_blank">https://discord.gg/BxkxRqGDfK</a>. Vous pouvez également utiliser le subreddit : <a href="https://www.reddit.com/r/signalidentification/" target="_blank">https://www.reddit.com/r/signalidentification/</a> en cas de doute sur une fréquence !</p>
+                <p><strong>En cas de besoin ou question :</strong></p>
+                <p><span onclick="toggleEmail()" style="cursor: pointer; color: #4db8ff; text-decoration: underline;">Cliquez ici pour afficher mon email</span></p>
+                <p id="email" style="display: none;">Email : <a href="mailto:goramstudio@gmail.com">goramstudio@gmail.com</a></p>
+            </div>
+            <div id="chatContainer" style="display: none;">
+                <button onclick="toggleChat()">Afficher/Masquer le Chat</button>
+                <button onclick="toggleLinks()">Liens Utiles</button>
+                <div id="usefulLinks" style="display: none;">
+                    <ul>
+                        <li><a href="http://sdr.aioshino.xyz:8073" target="_blank">SDR</a></li>
+                        <li><a href="http://sdr.aioshino.xyz:8073/#freq=29385000,mod=nfm,sql=-150" target="_blank">Kik Broadcast</a></li>
+                        <li><a href="https://discord.gg/N2QqVzqaY2" target="_blank">Discord</a></li>
+                        <li><a href="https://kittychan.xyz" target="_blank">Kittychan</a></li>
+                    </ul>
+                </div>
+                <div id="messages"></div>
+                <input type="text" id="message" maxlength="200" placeholder="Écrivez un message..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()">Envoyer</button>
+            </div>
+        </div>
+        
+        <div class="sidebar" id="rightSidebar">
+            <h3>Satellites NOAA</h3>
+            <div class="info-box" id="noaaBox">
+                <p id="noaaData">Chargement...</p>
+            </div>
+            <h3>Activité Solaire</h3>
+            <div class="solar-activity">
+                <a href="https://www.hamqsl.com/solar.html" title="Click to add Solar-Terrestrial Data to your website!">
+                    <img src="https://www.hamqsl.com/solarn0nbh.php">
+                </a>
+            </div>
+        </div>
+        <div class="gif-sidebar" id="rightGifSidebar">
+            <img src="https://media1.tenor.com/m/S76lurElibYAAAAd/tohru-maid-dragon.gif" alt="Anime GIF 7" class="large">
+            <img src="https://media1.tenor.com/m/K4PmOJXzhQ8AAAAd/yui-hirasawa-anime-girl.gif" alt="Anime GIF 8">
+            <img src="https://media1.tenor.com/m/Fkht-EVorQYAAAAd/chika.gif" alt="Anime GIF 9" class="small">
+            <img src="https://media1.tenor.com/m/enB0HSXVGcUAAAAd/anime-blush.gif" alt="Anime GIF 10">
+            <img src="https://media1.tenor.com/m/bODhDe1u03AAAAAd/lena-86eighty-six.gif" alt="Anime GIF 11" class="large">
+            <img src="https://media1.tenor.com/m/lIzs_Bo-dYMAAAAd/500-karma-karma-gain.gif" alt="Anime GIF 12" class="small">
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://compteur-ad33c-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let callsign = "";
+
+        function enterChat() {
+            const input = document.getElementById("callsign").value.trim();
+            if (input.length > 0 && input.length <= 10) {
+                callsign = input;
+                document.getElementById("callsignContainer").style.display = "none";
+                document.getElementById("chatContainer").style.display = "block";
+            } else {
+                alert("Votre callsign doit contenir entre 1 et 10 caractères.");
+            }
+        }
+
+        function sendMessage() {
+            let message = document.getElementById("message").value.trim();
+            if (message.length === 0 || message.length > 200) return;
+            message = message.replace(/freq:(\d+)/g, `<a href='https://sdr.aioshino.xyz:8073/#freq=$1,mod=nfm' target='_blank'>Écouter $1 MHz</a>`);
+            db.ref("messages").push({ callsign, message });
+            document.getElementById("message").value = "";
+        }
+
+        function loadMessages() {
+            db.ref("messages").on("value", (snapshot) => {
+                const messagesDiv = document.getElementById("messages");
+                messagesDiv.innerHTML = "";
+                snapshot.forEach((childSnapshot) => {
+                    const msg = childSnapshot.val();
+                    messagesDiv.innerHTML += `<p><strong>${msg.callsign}:</strong> ${msg.message}</p>`;
+                });
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            });
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+
+        function updatePing() {
+            const firebaseStart = performance.now();
+            fetch('https://compteur-ad33c-default-rtdb.europe-west1.firebasedatabase.app/.json')
+                .then(() => {
+                    const firebaseEnd = performance.now();
+                    document.getElementById("pingFirebase").textContent = (firebaseEnd - firebaseStart).toFixed(2);
+                });
+
+            const sdrStart = performance.now();
+            fetch('https://sdr.aioshino.xyz:8073')
+                .then(() => {
+                    const sdrEnd = performance.now();
+                    document.getElementById("pingSDR").textContent = (sdrEnd - sdrStart).toFixed(2);
+                })
+                .catch((error) => {
+                    const sdrEnd = performance.now();
+                    if (error.message.includes('SSL certificate') || error.message.includes('net::ERR_SSL_PROTOCOL_ERROR')) {
+                        document.getElementById("pingSDR").textContent = (sdrEnd - sdrStart).toFixed(2);
+                    } else {
+                        document.getElementById("pingSDR").textContent = "Erreur de connexion";
+                    }
+                });
+
+            const chatLoadTime = window.performance.timing.domContentLoadedEventEnd - window.performance.timing.navigationStart;
+            document.getElementById("pingChat").textContent = chatLoadTime.toFixed(2);
+        }
+
+        window.addEventListener('load', updatePing);
+
+        function updateWeather() {
+            fetch('https://api.open-meteo.com/v1/forecast?latitude=48.1173&longitude=-1.6778&current_weather=true')
+                .then(response => response.json())
+                .then(data => {
+                    const weatherBox = document.getElementById("weatherBox");
+                    const weather = data.current_weather;
+                    weatherBox.innerHTML = `
+                        <p>Température: ${weather.temperature}°C</p>
+                        <p>Vent: ${weather.windspeed} km/h</p>
+                        <p>Météo: ${weather.weathercode}</p>
+                    `;
+                })
+                .catch(error => {
+                    console.error('Error fetching weather data:', error);
+                    document.getElementById("weatherBox").innerHTML = "<p>Erreur de chargement des données météo.</p>";
+                });
+        }
+
+        function updateSatellites() {
+            const apiKey = 'AQWHMQ-QZYH3W-ELEN45-5FUI';
+            const url = `https://api.n2yo.com/rest/v1/satellite/above/48.1173/-1.6778/0/70/18/&apiKey=${apiKey}`;
+            const proxyUrl = 'https://api.allorigins.win/get?url=';
+
+            fetch(proxyUrl + encodeURIComponent(url))
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const parsedData = JSON.parse(data.contents);
+                    if (!parsedData.above) {
+                        throw new Error('Invalid data format');
+                    }
+                    const noaaBox = document.getElementById("noaaBox");
+                    const noaaSatellites = parsedData.above.filter(sat => 
+                        sat.satname.includes('NOAA 18') || 
+                        sat.satname.includes('NOAA 19') || 
+                        sat.satname.includes('NOAA 15')
+                    );
+                    if (noaaSatellites.length === 0) {
+                        noaaBox.innerHTML = "<p>Aucun satellite NOAA trouvé.</p>";
+                    } else {
+                        noaaBox.innerHTML = noaaSatellites.map(sat => `
+                            <p>${sat.satname}: ${sat.sataltitude} km</p>
+                            <p>Latitude: ${sat.satlat}</p>
+                            <p>Longitude: ${sat.satlng}</p>
+                        `).join('');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching satellite data:', error);
+                    document.getElementById("noaaBox").innerHTML = "<p>Erreur de chargement des données satellites.</p>";
+                });
+        }
+
+        setInterval(updateWeather, 30000);
+        setInterval(updateSatellites, 30000);
+        setInterval(updatePing, 30000);
+
+        function toggleLinks() {
+            const linksDiv = document.getElementById("usefulLinks");
+            if (linksDiv.style.display === "none") {
+                linksDiv.style.display = "block";
+            } else {
+                linksDiv.style.display = "none";
+            }
+        }
+
+        function toggleChat() {
+            const chatContainer = document.getElementById("chatContainer");
+            if (chatContainer.style.display === "none") {
+                chatContainer.style.display = "block";
+            } else {
+                chatContainer.style.display = "none";
+            }
+        }
+
+        function toggleEmail() {
+            const emailElement = document.getElementById("email");
+            emailElement.style.display = emailElement.style.display === "none" ? "block" : "none";
+        }
+    </script>
+</body>
+</html>
